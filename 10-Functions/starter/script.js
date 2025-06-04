@@ -421,4 +421,4 @@ GOOD LUCK 😀
 // Because of closure, the callback function is still able to access the variable from the IIFE.
 // Even though the environment in which the callback function was created is already gone, it is still able to access the variables that were created in the variable environment by the time the function was written.
 // Callback function remembers all the variables that were present at the time of it's birth.
-// Header is in the backpack of the callback function.
+// "header is in the backpack of the callback function"

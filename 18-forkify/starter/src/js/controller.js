@@ -1,14 +1,149 @@
-const recipeContainer = document.querySelector('.recipe');
+import * as model from "./model.js";
+import { MODAL_TIMEOUT_SEC } from "./config.js";
+import recipeView from "./views/recipeView.js";
+import searchView from "./views/searchView.js";
+import resultsView from "./views/resultsView.js";
+import paginationView from "./views/paginationView.js";
+import bookmarksView from "./views/bookmarksView.js";
+import addRecipeView from "./views/addRecipeView.js";
 
-const timeout = function (s) {
-  return new Promise(function (_, reject) {
-    setTimeout(function () {
-      reject(new Error(`Request took too long! Timeout after ${s} second`));
-    }, s * 1000);
-  });
+import "core-js/stable";
+import "regenerator-runtime/runtime";
+
+// Parcel hot module reloading
+if (module.hot) {
+  module.hot.accept();
+}
+
+const controlRecipes = async function () {
+  try {
+    const id = window.location.hash.slice(1);
+
+    if (!id) return;
+    recipeView.renderSpinner();
+
+    // Update results view to mark selected search result
+    resultsView.update(model.getSearchResultsPage());
+
+    // Updating bookmarks view
+    bookmarksView.update(model.state.bookmarks);
+
+    // Loading recipe
+    await model.loadRecipe(id);
+
+    // Rendering recipe
+    recipeView.render(model.state.recipe);
+  } catch (err) {
+    recipeView.renderError();
+    console.error(err);
+  }
 };
 
-// NEW API URL (instead of the one shown in the video)
-// https://forkify-api.jonas.io
+const controlSearchResults = async function () {
+  try {
+    resultsView.renderSpinner();
 
-///////////////////////////////////////
+    // Get search query
+    const query = searchView.getQuery();
+    if (!query) return;
+
+    // Load search results
+    await model.loadSearchResults(query);
+
+    // Render results
+    // resultsView.render(model.state.search.results); // all results
+    resultsView.render(model.getSearchResultsPage());
+
+    // Render pagination buttons
+    paginationView.render(model.state.search);
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const controlPagination = function (goToPage) {
+  // Render new results
+  resultsView.render(model.getSearchResultsPage(goToPage));
+
+  // Render new pagination buttons
+  paginationView.render(model.state.search);
+};
+
+const controlServings = function (newServings) {
+  // Update recipe servings (state)
+  model.updateServings(newServings);
+
+  // Update recipeview - rerender entire recipe
+  // recipeView.render(model.state.recipe);
+  recipeView.update(model.state.recipe);
+};
+
+const controlAddBookmark = function () {
+  // Add/remove bookmark
+  if (!model.state.recipe.bookmarked) model.addBookmark(model.state.recipe);
+  else model.deleteBookmark(model.state.recipe.id);
+
+  // Update recipe view
+  recipeView.update(model.state.recipe);
+
+  // Render bookmarks
+  bookmarksView.render(model.state.bookmarks);
+};
+
+const controlBookmarks = function () {
+  bookmarksView.render(model.state.bookmarks);
+};
+
+const controlAddRecipe = async function (newRecipe) {
+  try {
+    // Loading spinner
+    addRecipeView.renderSpinner();
+
+    // Upload new recipe data
+    await model.uploadRecipe(newRecipe);
+    console.log(model.state.recipe);
+
+    // Render recipe
+    recipeView.render(model.state.recipe);
+
+    // Success message
+    addRecipeView.renderSuccessMessage();
+
+    // Render bookmarks view
+    bookmarksView.render(model.state.bookmarks);
+
+    // Change ID in url
+    window.history.pushState(null, "", `#${model.state.recipe.id}`);
+
+    // Close form window
+    setTimeout(function () {
+      addRecipeView.toggleWindow();
+    }, MODAL_TIMEOUT_SEC * 1000);
+  } catch (err) {
+    console.error("💥", err);
+    addRecipeView.renderError(err.message);
+  }
+};
+
+const init = function () {
+  // publisher-subscriber pattern
+  bookmarksView.addHandlerRender(controlBookmarks);
+  recipeView.addHandlerRender(controlRecipes);
+  recipeView.addHandlerUpdateServings(controlServings);
+  recipeView.addHandlerAddBookmark(controlAddBookmark);
+  searchView.addHandlerSearch(controlSearchResults);
+  paginationView.addHandlerClick(controlPagination);
+  addRecipeView.addHandlerUpload(controlAddRecipe);
+};
+init();
+
+/*
+Future improvements and feature ideas
+- Display number of pages between pagination buttons
+- Ability to sort search results by duration or ingredients
+- Perform ingredient validation, before submitting form
+- Improve recipe ingredient input, e.g. separate fields
+- Shopping list feature, add recipe ingredients to list
+- Weekly meal planning feature, assign recipes to next week and show on weekly calendar
+- Get nutrition data on each ingredient from spoonacular API and calculate total calories of recipe
+*/
